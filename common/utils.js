@@ -46,12 +46,12 @@ const utils = {
         return cache.data;
     },
     getSelectedText() {
-        let editer = vscode.window.activeTextEditor;
-        let content = editer.document.getText(editer.selection);
+        let editor = vscode.window.activeTextEditor;
+        let content = editor.document.getText(editor.selection);
         return content;
     },
     insertContent(content) {
-        let editer = vscode.window.activeTextEditor;
+        let editor = vscode.window.activeTextEditor;
         let snippet = {
             "${1:snippet name}": {
                 prefix: "${2:$1}",
@@ -60,7 +60,7 @@ const utils = {
             }
         };
         let s = JSON.stringify(snippet, null, 4);
-        editer.insertSnippet(new vscode.SnippetString(s), editer.selection);
+        editor.insertSnippet(new vscode.SnippetString(s), editor.selection);
     },
     endSelection(document) {
         let maxLine = document.lineCount - 1;
