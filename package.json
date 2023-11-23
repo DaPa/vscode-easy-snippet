@@ -2,7 +2,7 @@
 	"name": "easy-snippet",
 	"displayName": "Easy Snippet",
 	"description": "Turn your selection into a snippet",
-	"version": "0.6.3",
+	"version": "0.7.0",
 	"publisher": "inu1255",
 	"engines": {
 		"vscode": "^1.16.0"
@@ -107,6 +107,78 @@
 					"light": "resources/light/edit.svg",
 					"dark": "resources/dark/edit.svg"
 				}
+			},
+			{
+				"command": "snippetScopeExplorer.search",
+				"title": "Search Scope",
+				"category": "Easy Snippet",
+				"icon": {
+					"light": "resources/light/search.svg",
+					"dark": "resources/dark/search.svg"
+				}
+			},
+			{
+				"command": "snippetScopeExplorer.refresh",
+				"title": "Refresh Scope",
+				"category": "Easy Snippet",
+				"icon": {
+					"light": "resources/light/refresh.svg",
+					"dark": "resources/dark/refresh.svg"
+				}
+			},
+			{
+				"command": "snippetScopeExplorer.addGroup",
+				"title": "Add Scope Group",
+				"category": "Easy Snippet",
+				"icon": {
+					"light": "resources/light/add.svg",
+					"dark": "resources/dark/add.svg"
+				}
+			},
+			{
+				"command": "snippetScopeExplorer.addSnippet",
+				"title": "Add Snippet",
+				"category": "Easy Snippet",
+				"icon": {
+					"light": "resources/light/add.svg",
+					"dark": "resources/dark/add.svg"
+				}
+			},
+			{
+				"command": "snippetScopeExplorer.editGroup",
+				"title": "Edit Group",
+				"category": "Easy Snippet",
+				"icon": {
+					"light": "resources/light/edit.svg",
+					"dark": "resources/dark/edit.svg"
+				}
+			},
+			{
+				"command": "snippetScopeExplorer.deleteGroup",
+				"title": "Delete Snippet File",
+				"category": "Easy Snippet",
+				"icon": {
+					"light": "resources/light/delete.svg",
+					"dark": "resources/dark/delete.svg"
+				}
+			},
+			{
+				"command": "snippetScopeExplorer.deleteSnippet",
+				"title": "Delete Snippet",
+				"category": "Easy Snippet",
+				"icon": {
+					"light": "resources/light/delete.svg",
+					"dark": "resources/dark/delete.svg"
+				}
+			},
+			{
+				"command": "snippetScopeExplorer.editSnippet",
+				"title": "Edit Snippet",
+				"category": "Easy Snippet",
+				"icon": {
+					"light": "resources/light/edit.svg",
+					"dark": "resources/dark/edit.svg"
+				}
 			}
 		],
 		"keybindings": [
@@ -131,6 +203,10 @@
 				{
 					"id": "snippetExplorer",
 					"name": "Snippet Manager"
+				},
+				{
+					"id": "snippetScopeExplorer",
+					"name": "Snippet Scope Manager"
 				}
 			]
 		},
@@ -159,6 +235,26 @@
 				{
 					"command": "snippetExplorer.editSnippet",
 					"when": "1 == 2"
+				},
+				{
+					"command": "snippetScopeExplorer.addSnippet",
+					"when": "1 == 2"
+				},
+				{
+					"command": "snippetScopeExplorer.editGroup",
+					"when": "1 == 2"
+				},
+				{
+					"command": "snippetScopeExplorer.deleteGroup",
+					"when": "1 == 2"
+				},
+				{
+					"command": "snippetScopeExplorer.deleteSnippet",
+					"when": "1 == 2"
+				},
+				{
+					"command": "snippetScopeExplorer.editSnippet",
+					"when": "1 == 2"
 				}
 			],
 			"view/title": [
@@ -175,6 +271,21 @@
 				{
 					"command": "snippetExplorer.addGroup",
 					"when": "view == snippetExplorer",
+					"group": "navigation"
+				},
+				{
+					"command": "snippetScopeExplorer.search",
+					"when": "view == snippetScopeExplorer",
+					"group": "navigation"
+				},
+				{
+					"command": "snippetScopeExplorer.refresh",
+					"when": "view == snippetScopeExplorer",
+					"group": "navigation"
+				},
+				{
+					"command": "snippetScopeExplorer.addGroup",
+					"when": "view == snippetScopeExplorer",
 					"group": "navigation"
 				}
 			],
@@ -198,6 +309,26 @@
 					"command": "snippetExplorer.deleteSnippet",
 					"when": "view == snippetExplorer && viewItem == snippet",
 					"group": "inline"
+				},
+				{
+					"command": "snippetScopeExplorer.addSnippet",
+					"when": "view == snippetScopeExplorer && viewItem == group",
+					"group": "inline@1"
+				},
+				{
+					"command": "snippetScopeExplorer.editGroup",
+					"when": "view == snippetScopeExplorer && viewItem == group",
+					"group": "inline@2"
+				},
+				{
+					"command": "snippetScopeExplorer.deleteGroup",
+					"when": "view == snippetScopeExplorer && viewItem == group",
+					"group": "inline@3"
+				},
+				{
+					"command": "snippetScopeExplorer.deleteSnippet",
+					"when": "view == snippetScopeExplorer && viewItem == snippet",
+					"group": "inline"
 				}
 			]
 		}
@@ -214,7 +345,8 @@
 		"vscode": "^1.1.30"
 	},
 	"dependencies": {
-		"@types/vscode": "^1.17.0"
+		"@types/vscode": "^1.17.0",
+		"comment-json": "^4.2.3"
 	},
 	"repository": {
 		"type": "git",

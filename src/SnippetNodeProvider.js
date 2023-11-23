@@ -3,6 +3,7 @@ const utils = require("../common/utils");
 const fs = require("fs");
 const path = require("path");
 const os = require("os");
+const cjson = require("comment-json");
 
 class SnippetNodeProvider {
 	constructor() {
@@ -19,45 +20,31 @@ class SnippetNodeProvider {
 		try {
 			stat = fs.statSync(filename);
 		} catch (error) {
-			return { data: {} };
+			return {data: {}};
 		}
 		let cache = this.caches[languageId] || {};
-		if (cache && cache.t >= stat.mtime.getTime())
-			return cache;
+		if (cache && cache.t >= stat.mtime.getTime()) return cache;
+		console.log("read", filename);
 		let text = fs.readFileSync(filename, "utf8");
-		let data = new Function('return ' + text)();
+		let data = cjson.parse(text);
 		let list = [];
 		for (let key in data) {
 			let v = data[key];
 			let label = key;
 			let description = v.description;
-			let contextValue = 'snippet';
+			let contextValue = "snippet";
 			let command = {
-				command: 'snippetExplorer.editSnippet',
-				arguments: [{ languageId, key }],
-				title: 'Edit Snippet.'
+				command: "snippetExplorer.editSnippet",
+				arguments: [{languageId, key}],
+				title: "Edit Snippet.",
 			};
-			list.push({ label, description, languageId, contextValue, command });
+			list.push({label, description, languageId, contextValue, command});
 		}
-		list.sort((a, b) => a.label > b.label ? 1 : -1);
+		list.sort((a, b) => (a.label > b.label ? 1 : -1));
 		cache.t = stat.mtime.getTime();
 		cache.list = list;
 		cache.data = data;
-		return this.caches[languageId] = cache;
-	}
-
-	async search() {
-		let languageId = await utils.pickLanguage()
-		if(!languageId) return;
-		if(!this.caches[languageId])
-			this.getSnippets(languageId)
-		if(!this.caches[languageId])
-			return vscode.window.showErrorMessage(`no snippet in language: ${languageId}`)
-		let list = this.caches[languageId].list
-		let item = await vscode.window.showQuickPick(list, { placeHolder: '' });
-		let key = item.label;
-		this.tree.reveal({ languageId, label: key });
-		this.editSnippet({key, languageId})
+		return (this.caches[languageId] = cache);
 	}
 
 	getSnippet(languageId, key) {
@@ -69,6 +56,33 @@ class SnippetNodeProvider {
 		this._onDidChangeTreeData.fire();
 	}
 
+	async search() {
+		let currentLanguage =
+			vscode.window.activeTextEditor && vscode.window.activeTextEditor.document.languageId;
+		let items = this.getChildren().map(({label}) => ({
+			label: label,
+			description: label == currentLanguage ? "current language" : "",
+		}));
+		if (currentLanguage) {
+			items.sort((a, b) => {
+				if (a.description) return -1;
+				if (b.description) return 1;
+				return a.label > b.label ? 1 : -1;
+			});
+		}
+		let languageId = await vscode.window
+			.showQuickPick(items, {placeHolder: "please select snippet language"})
+			.then((x) => x && x.label);
+		if (!languageId) return;
+		if (!this.caches[languageId]) this.getSnippets(languageId);
+		if (!this.caches[languageId])
+			return vscode.window.showErrorMessage(`no snippet in language: ${languageId}`);
+		let list = this.caches[languageId].list;
+		let item = await vscode.window.showQuickPick(list, {placeHolder: "please select snippet"});
+		let key = item.label;
+		this.tree.reveal({languageId, label: key});
+		this.editSnippet({key, languageId});
+	}
 
 	getTreeItem(element) {
 		return element;
@@ -77,52 +91,52 @@ class SnippetNodeProvider {
 	getChildren(element) {
 		if (!element) {
 			let filenames = fs.readdirSync(utils.vsCodeSnippetsPath);
-			return filenames.filter(x => x.endsWith('.json')).map(x => ({
-				label: x.slice(0, -5),
-				contextValue: 'group',
-				collapsibleState: true
-			}));
+			return filenames
+				.filter((x) => x.endsWith(".json"))
+				.map((x) => ({
+					label: x.slice(0, -5),
+					contextValue: "group",
+					collapsibleState: vscode.TreeItemCollapsibleState.Collapsed,
+				}));
 		}
-		if (element.contextValue == 'group') {
+		if (element.contextValue == "group") {
 			let cache = this.getSnippets(element.label);
 			return cache.list;
 		}
-		return element ? this.model.getChildren(element) : this.model.roots;
 	}
 
 	getParent(e) {
 		if (e.languageId) {
-			let list = this.getChildren();
-			return list.find(x => x.label == e.languageId);
+			return {label: e.languageId};
 		}
-		return null;
 	}
 
 	snippetPath(languageId) {
-		return path.join(utils.vsCodeSnippetsPath, languageId + '.json');
+		return path.join(utils.vsCodeSnippetsPath, languageId + ".json");
 	}
 
 	async addGroup() {
-		let languageId = await utils.pickLanguage()
+		let set = new Set(this.getChildren().map((x) => x.label));
+		let languageId = await utils.pickLanguage((items) => items.filter((x) => !set.has(x.label)));
 		if (!languageId) return;
 		let filename = this.snippetPath(languageId);
-		if (!fs.existsSync(filename))
-			fs.writeFileSync(filename, '{}');
+		if (!fs.existsSync(filename)) fs.writeFileSync(filename, "{}");
 		this.refresh();
-		this.addSnippet({label:languageId})
+		this.addSnippet({label: languageId});
 	}
+
 	/**
-	 * @param {{label:string}} e 
+	 * @param {{label:string}} e
 	 */
 	async addSnippet(e, def) {
-		if(!def) {
-			let text = utils.getSelectedText()
-			if(text) def = { body: text.replace(/\$/g, '\\$') }
+		if (!def) {
+			let text = utils.getSelectedText();
+			if (text) def = {body: text.replace(/\$/g, "\\$")};
 		}
 		let languageId = e.label;
-		let key = await vscode.window.showInputBox({ placeHolder: 'snippet key' });
+		let key = await vscode.window.showInputBox({placeHolder: "snippet key"});
 		if (key) {
-			this.editSnippet({ languageId, key }, def);
+			this.editSnippet({languageId, key}, def);
 			this.refresh();
 		}
 	}
@@ -131,70 +145,76 @@ class SnippetNodeProvider {
 		vscode.window.showTextDocument(vscode.Uri.file(filename));
 	}
 	async deleteGroup(item) {
-		let flag = await vscode.window.showQuickPick(['No', 'Yes'], { placeHolder: `Are you sure? delete snippet "${item.label}.json"` });
+		let flag = await vscode.window.showQuickPick(["No", "Yes"], {
+			placeHolder: `Are you sure? delete snippet "${item.label}.json"`,
+		});
 		if (flag != "Yes") return;
 		let filename = this.snippetPath(item.label);
 		fs.unlinkSync(filename);
 		this.refresh();
 	}
 	/**
-	 * @param {{label:string,languageId:string}} e 
+	 * @param {{label:string,languageId:string}} e
 	 */
 	async deleteSnippet(e) {
-		let flag = await vscode.window.showQuickPick(['No', 'Yes'], { placeHolder: `Are you sure? delete snippet "${e.label}.${e.languageId}"` });
+		let flag = await vscode.window.showQuickPick(["No", "Yes"], {
+			placeHolder: `Are you sure? delete snippet "${e.label}.${e.languageId}"`,
+		});
 		if (flag != "Yes") return;
 		let cache = this.getSnippets(e.languageId);
 		if (!cache.data[e.label]) return;
 		let filename = this.snippetPath(e.languageId);
 		delete cache.data[e.label];
+		fs.writeFileSync(filename, cjson.stringify(cache.data, null, 2), "utf8");
+		cache.list = cache.list.filter((x) => x.label != e.label);
 		cache.t = +new Date();
-		fs.writeFileSync(filename, JSON.stringify(cache.data, null, 2), 'utf8');
 		this.refresh();
 	}
 	/**
-	 * @param {{key:string,languageId:string}} e 
+	 * @param {{key:string,languageId:string}} e
 	 * @param {Snippet} def new snippet template
 	 */
 	async editSnippet(e, def) {
-		def = Object.assign({ prefix: e.key, body: "" }, def);
+		def = Object.assign({prefix: e.key, body: ""}, def);
 		let snippet = this.getSnippet(e.languageId, e.key);
 		if (!snippet) snippet = def;
 		if (!snippet.prefix) snippet.prefix = def.prefix;
-		let text = this.snippet2text(snippet, e.languageId);
+		let text = utils.snippet2text(snippet, e.languageId);
 
-		let filename = path.join(os.tmpdir(), Buffer.from(e.key).toString('base64').replace(/\//g, '-') + '.' + e.languageId + '.snippet');
-		let content
-		if (!fs.existsSync(filename))
-			fs.writeFileSync(filename, content = text);
+		let filename = path.join(
+			os.tmpdir(),
+			Buffer.from(e.key).toString("base64").replace(/\//g, "-") + "." + e.languageId + ".snippet"
+		);
+		let content;
+		if (!fs.existsSync(filename)) fs.writeFileSync(filename, (content = text));
 		let editor = await vscode.window.showTextDocument(vscode.Uri.file(filename));
-		await vscode.languages.setTextDocumentLanguage(editor.document, e.languageId);
+		await vscode.languages.setTextDocumentLanguage(editor.document, e.languageId).catch(() => {});
 		let range = utils.selectAllRange(editor.document);
-		if(content==null)
-		content = editor.document.getText(range)
-		if(content==text) return;
+		if (content == null) content = editor.document.getText(range);
+		if (content == text) return;
 		await editor.edit((eb) => {
 			eb.replace(range, text);
 		});
 		editor.selection = utils.endSelection(editor.document);
 	}
 	/**
-	 * @param {string} text 
+	 * @param {string} text
 	 */
 	text2snippet(text, languageId) {
 		let comment = utils.getLineComment(languageId);
 		let snippet = {};
-		let lines = text.split('\n');
+		let lines = text.split("\n");
 		let body = "";
 		for (let i = 0; i < lines.length; i++) {
-			if (lines[i] == '/* eslint-disable */') {
+			if (lines[i] == "/* eslint-disable */") {
 				body = lines.slice(i + 1);
-				while (body[0] == '') body.shift();
+				while (body[0] == "") body.shift();
 				lines = lines.slice(0, i);
 				break;
 			}
 			if (!lines[i].startsWith(comment)) {
 				body = lines.slice(i);
-				while (body[0] == '') body.shift();
+				while (body[0] == "") body.shift();
 				lines = lines.slice(0, i);
 				break;
 			}
@@ -209,52 +229,49 @@ class SnippetNodeProvider {
 				key = prev.trim().slice(1);
 				snippet[key] = (snippet[key] || "") + line.slice(prev.length);
 			} else if (prev) {
-				snippet[key] += '\n' + line.replace(/^\s+/, '');
+				snippet[key] += "\n" + line.replace(/^\s+/, "");
 			}
 		}
 		snippet.body = body;
 		return snippet;
 	}
-	snippet2text(snippet, languageId) {
-		let comment = utils.getLineComment(languageId);
-		let text = "";
 
-		for (let k of ["prefix", "description"]) {
-			if (k == "body") continue;
-			let v = snippet[k] || '';
-			for (let item of v.split('\n')) {
-				text += `${comment} @${k} ${item}\n`;
-				if (k[0] != ' ') k = Array.from(k).fill(' ').join();
-			}
-		}
-		if (languageId == 'javascript')
-			text += "/* eslint-disable */\n";
-		text += "\n";
-		if (snippet.body instanceof Array)
-			text += snippet.body.join('\n');
-		else
-			text += snippet.body || '';
-		return text;
-	}
 	/**
 	 * 保存代码片段
-	 * @param {string} languageId 
-	 * @param {string} key 
-	 * @param {string} text 
+	 * @param {string} languageId
+	 * @param {string} key
+	 * @param {string} text
 	 */
 	saveSnippet(languageId, key, text) {
 		let filename = this.snippetPath(languageId);
 		let cache = this.getSnippets(languageId);
 		let snippet = this.text2snippet(text, languageId);
-		if (!snippet.prefix)
-			return vscode.window.showErrorMessage('@prefix is required');
+		if (!snippet.prefix) return vscode.window.showErrorMessage("@prefix is required");
 		if (!snippet.body || !snippet.body.length)
 			return vscode.window.showErrorMessage("snippet body can't be empty");
-		cache.data[key] = snippet;
+		if (cache.data[key]) Object.assign(cache.data[key], snippet);
+		else cache.data[key] = snippet;
+		fs.writeFileSync(filename, cjson.stringify(cache.data, null, 2), "utf8");
+		let item = cache.list.find((x) => x.label == key);
+		if (item) item.description = snippet.description;
+		else {
+			cache.list.push({
+				label: key,
+				description: snippet.description,
+				languageId,
+				contextValue: "snippet",
+				command: {
+					command: "snippetExplorer.editSnippet",
+					arguments: [{languageId, key}],
+					title: "Edit Snippet.",
+				},
+			});
+			cache.list.sort((a, b) => (a.label > b.label ? 1 : -1));
+		}
 		cache.t = +new Date();
-		fs.writeFileSync(filename, JSON.stringify(cache.data, null, 2), 'utf8');
 		vscode.window.showInformationMessage(`snippet "${key}.${languageId}" save success`);
-		this.tree.reveal({ languageId, label: key });
+		this.refresh();
+		this.tree.reveal({languageId, label: key});
 	}
 }
 
