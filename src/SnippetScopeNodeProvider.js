@@ -61,11 +61,13 @@ class SnippetScopeNodeProvider {
 
 	refresh() {
 		this.data = [];
+		// active file
 		let editor = vscode.window.activeTextEditor;
 		if (editor) {
 			let doc = editor.document;
 			this.openFile(doc.fileName, doc.getText());
 		}
+		// workspace
 		let fs = vscode.workspace.fs;
 		for (let folder of vscode.workspace.workspaceFolders) {
 			console.log("scan folder:", folder.uri.fsPath);
@@ -76,6 +78,14 @@ class SnippetScopeNodeProvider {
 				});
 			});
 		}
+		// global
+		let url = vscode.Uri.file(utils.getVsCodeSnippetsPath());
+		fs.readDirectory(url).then((list) => {
+			list.forEach(([filepath, type]) => {
+				if (type != vscode.FileType.File) return;
+				this.openFile(path.join(url.fsPath, filepath));
+			});
+		});
 	}
 
 	async search() {
@@ -107,7 +117,7 @@ class SnippetScopeNodeProvider {
 
 	getTreeItem(e) {
 		if (e.contextValue) return e;
-		let item = this.findItem(e.filepath);
+		let item = this.findGroup(e.filepath);
 		if (!item) return;
 		return item.children.find((x) => x.label == e.label);
 	}
@@ -125,6 +135,31 @@ class SnippetScopeNodeProvider {
 		if (item) return item.parent;
 	}
 
+	findGroup(filepath) {
+		let item = this.data.find((item) => item.filepath == filepath);
+		if (!item) this.openFile(filepath);
+		item = this.data.find((item) => item.filepath == filepath);
+		return item;
+	}
+
+	pickGroup() {
+		return vscode.window.showQuickPick(this.data, {
+			placeHolder: this.data.length
+				? "select snippet file"
+				: "no scope snippet file found, please create first",
+		});
+	}
+
+	async pickSnippet(item) {
+		item = item || (await this.pickGroup());
+		if (!item) return;
+		return vscode.window.showQuickPick(item.children, {
+			placeHolder: item.children.length
+				? "select snippet"
+				: "no snippet in this file, please add snippet first",
+		});
+	}
+
 	async addGroup() {
 		let name = await vscode.window.showInputBox({placeHolder: "snippet file name"});
 		if (!name) return;
@@ -136,42 +171,49 @@ class SnippetScopeNodeProvider {
 	}
 
 	/**
-	 * @param {{filepath:string;key:string;scope?:string;body?:string;}} e
+	 * @param {{filepath:string;key:string;scope?:string;body?:string;}} item
 	 */
-	async addSnippet(e) {
-		if (!e.filepath) {
-			let item = await vscode.window.showQuickPick(this.data, {
-				placeHolder: "select snippet file",
-			});
+	async addSnippet(item) {
+		if (!item) {
+			// call from command
+			item = await this.pickGroup();
 			if (!item) return;
-			e.filepath = item.filepath;
 		}
 
-		let body = e.body;
+		let body = item.body;
 		if (!body) {
 			let text = utils.getSelectedText();
 			if (text) body = text.replace(/\$/g, "\\$");
 		}
 
-		let scope =
-			vscode.window.activeTextEditor && vscode.window.activeTextEditor.document.languageId;
+		let scope = utils.getCurrentLanguage();
 		if ("javascript,typescript,javascriptreact,typescriptreact".includes(scope)) {
 			scope = "javascript,typescript,javascriptreact,typescriptreact";
 		}
 		if (scope == "vue") {
 			scope = "vue,vue-html";
 		}
-		let key = e.key || (await vscode.window.showInputBox({placeHolder: "snippet key"}));
+		let key = item.key || (await vscode.window.showInputBox({placeHolder: "snippet key"}));
 		if (key) {
-			this.editSnippet({filepath: e.filepath, key, scope, body});
+			this.editSnippet({filepath: item.filepath, key, scope, body});
 		}
 	}
 
 	async editGroup(item) {
+		if (!item) {
+			// call from command
+			item = await this.pickGroup();
+			if (!item) return;
+		}
 		vscode.window.showTextDocument(vscode.Uri.file(item.filepath));
 	}
 
 	async deleteGroup(item) {
+		if (!item) {
+			// call from command
+			item = await this.pickGroup();
+			if (!item) return;
+		}
 		let flag = await vscode.window.showQuickPick(["No", "Yes"], {
 			placeHolder: `Are you sure? delete snippet "${item.label}.json"`,
 		});
@@ -182,9 +224,14 @@ class SnippetScopeNodeProvider {
 	}
 
 	async deleteSnippet(e) {
+		if (!e) {
+			// call from command
+			e = await this.pickSnippet();
+			if (!e) return;
+		}
 		if (!e.parent || !e.parent.filepath)
 			return vscode.window.showErrorMessage(`snippet file not found: [${e.label}]`);
-		let item = this.findItem(e.parent.filepath);
+		let item = this.findGroup(e.parent.filepath);
 		if (!item) return vscode.window.showErrorMessage(`snippet file not found: ${e.filepath}`);
 		if (!item.data[e.label])
 			return vscode.window.showErrorMessage(`snippet "${e.label}" not found in ${e.filepath}`);
@@ -200,18 +247,53 @@ class SnippetScopeNodeProvider {
 		this._onDidChangeTreeData.fire();
 	}
 
-	findItem(filepath) {
-		let item = this.data.find((item) => item.filepath == filepath);
-		if (!item) this.openFile(filepath);
-		item = this.data.find((item) => item.filepath == filepath);
-		return item;
+	async renameSnippet(e) {
+		if (!e) {
+			// call from command
+			e = await this.pickSnippet();
+			if (!e) return;
+		}
+		if (!e.parent || !e.parent.filepath)
+			return vscode.window.showErrorMessage(`snippet file not found: [${e.label}]`);
+		let item = this.findGroup(e.parent.filepath);
+		if (!item) return vscode.window.showErrorMessage(`snippet file not found: ${e.filepath}`);
+		if (!item.data[e.label])
+			return vscode.window.showErrorMessage(`snippet "${e.label}" not found in ${e.filepath}`);
+		let name = await vscode.window.showInputBox({placeHolder: "rename snippet"});
+		if (!name) return;
+		if (name == e.label) return;
+		if (item.data[name]) {
+			let flag = await vscode.window.showQuickPick(["No", "Yes"], {
+				placeHolder: `Are you sure? overwrite snippet "${name}"`,
+			});
+			if (flag != "Yes") return;
+			item.children = item.children.filter((x) => x.label != name);
+		}
+		item.data[name] = item.data[e.label];
+		delete item.data[e.label];
+		let child = item.children.find((x) => x.label == e.label);
+		if (child) {
+			child.label = name;
+			child.command.arguments[0].key = name;
+		}
+		let content = cjson.stringify(item.data, null, 2);
+		fs.writeFileSync(e.parent.filepath, content, "utf8");
+		e.parent.text = content;
+		this._onDidChangeTreeData.fire();
+		this.editSnippet({filepath: e.parent.filepath, key: name});
 	}
 
 	/**
 	 * @param {{filepath:string;key:string;scope?:string;body?:string;}} e
 	 */
 	async editSnippet(e) {
-		let item = this.findItem(e.filepath);
+		if (!e) {
+			// call from command
+			e = await this.pickSnippet();
+			if (!e) return;
+			e = {filepath: e.parent.filepath, key: e.label};
+		}
+		let item = this.findGroup(e.filepath);
 		if (!item) return vscode.window.showErrorMessage(`snippet file not found: ${e.filepath}`);
 		let snippet = {...item.data[e.key], ...e};
 		let languageId = "javascript";
@@ -236,57 +318,19 @@ class SnippetScopeNodeProvider {
 		});
 		editor.selection = utils.endSelection(editor.document);
 	}
-	/**
-	 * @param {string} text
-	 */
-	text2snippet(text, languageId) {
-		let comment = utils.getLineComment(languageId);
-		let snippet = {};
-		let lines = text.split("\n");
-		let body = "";
-		for (let i = 0; i < lines.length; i++) {
-			if (lines[i] == "/* eslint-disable */") {
-				body = lines.slice(i + 1);
-				while (body[0] == "") body.shift();
-				lines = lines.slice(0, i);
-				break;
-			}
-			if (!lines[i].startsWith(comment)) {
-				body = lines.slice(i);
-				while (body[0] == "") body.shift();
-				lines = lines.slice(0, i);
-				break;
-			}
-		}
-		let prev;
-		let key;
-		for (let line of lines) {
-			line = line.slice(comment.length);
-			let m = /\s*@\w+\s*/.exec(line);
-			if (m) {
-				prev = m[0];
-				key = prev.trim().slice(1);
-				snippet[key] = (snippet[key] || "") + line.slice(prev.length);
-			} else if (prev) {
-				snippet[key] += "\n" + line.replace(/^\s+/, "");
-			}
-		}
-		snippet.body = body;
-		return snippet;
-	}
 
 	/**
 	 * 保存代码片段
 	 */
 	saveSnippet(text, languageId) {
-		let snippet = this.text2snippet(text, languageId);
+		let snippet = utils.text2snippet(text, languageId);
 		let {filepath, key, ...rest} = snippet;
 		if (!filepath) return vscode.window.showErrorMessage("@filepath is required");
 		if (!key) return vscode.window.showErrorMessage("@key is required");
 		if (!snippet.prefix) return vscode.window.showErrorMessage("@prefix is required");
 		if (!snippet.body || !snippet.body.length)
 			return vscode.window.showErrorMessage("snippet body can't be empty");
-		let item = this.findItem(filepath);
+		let item = this.findGroup(filepath);
 		let data = item ? item.data : {};
 		if (data[snippet.key]) Object.assign(data[snippet.key], rest);
 		else data[snippet.key] = rest;

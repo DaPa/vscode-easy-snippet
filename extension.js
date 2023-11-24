@@ -18,60 +18,27 @@ function activate(context) {
 	scope_provider.tree = scope_explorer;
 	scope_provider.refresh();
 	context.subscriptions.push(
-		// vscode.window.registerTreeDataProvider('snippetExplorer', provider),
-		vscode.commands.registerCommand("snippetExplorer.refresh", provider.refresh.bind(provider)),
-		vscode.commands.registerCommand("snippetExplorer.search", provider.search.bind(provider)),
-		vscode.commands.registerCommand("snippetExplorer.addGroup", provider.addGroup.bind(provider)),
-		vscode.commands.registerCommand(
-			"snippetExplorer.addSnippet",
-			provider.addSnippet.bind(provider)
-		),
-		vscode.commands.registerCommand("snippetExplorer.editGroup", provider.editGroup.bind(provider)),
-		vscode.commands.registerCommand(
-			"snippetExplorer.deleteGroup",
-			provider.deleteGroup.bind(provider)
-		),
-		vscode.commands.registerCommand(
-			"snippetExplorer.deleteSnippet",
-			provider.deleteSnippet.bind(provider)
-		),
-		vscode.commands.registerCommand(
-			"snippetExplorer.editSnippet",
-			provider.editSnippet.bind(provider)
-		),
-		// scope snippets
-		vscode.commands.registerCommand(
-			"snippetScopeExplorer.refresh",
-			scope_provider.refresh.bind(scope_provider)
-		),
-		vscode.commands.registerCommand(
-			"snippetScopeExplorer.search",
-			scope_provider.search.bind(scope_provider)
-		),
-		vscode.commands.registerCommand(
-			"snippetScopeExplorer.addGroup",
-			scope_provider.addGroup.bind(scope_provider)
-		),
-		vscode.commands.registerCommand(
-			"snippetScopeExplorer.addSnippet",
-			scope_provider.addSnippet.bind(scope_provider)
-		),
-		vscode.commands.registerCommand(
-			"snippetScopeExplorer.editGroup",
-			scope_provider.editGroup.bind(scope_provider)
-		),
-		vscode.commands.registerCommand(
-			"snippetScopeExplorer.deleteGroup",
-			scope_provider.deleteGroup.bind(scope_provider)
-		),
-		vscode.commands.registerCommand(
-			"snippetScopeExplorer.deleteSnippet",
-			scope_provider.deleteSnippet.bind(scope_provider)
-		),
-		vscode.commands.registerCommand(
-			"snippetScopeExplorer.editSnippet",
-			scope_provider.editSnippet.bind(scope_provider)
-		),
+		...[
+			"refresh",
+			"search",
+			"addGroup",
+			"addSnippet",
+			"editGroup",
+			"deleteGroup",
+			"deleteSnippet",
+			"renameSnippet",
+			"editSnippet",
+		]
+			.map((key) => {
+				return [
+					vscode.commands.registerCommand(`snippetExplorer.${key}`, provider[key].bind(provider)),
+					vscode.commands.registerCommand(
+						`snippetScopeExplorer.${key}`,
+						scope_provider[key].bind(scope_provider)
+					),
+				];
+			})
+			.flat(),
 		vscode.commands.registerCommand("snippetScopeExplorer.open", function () {
 			explorer.reveal(provider.getChildren()[0]);
 		}),
@@ -88,13 +55,13 @@ function activate(context) {
 					return;
 				}
 			}
-			let label = vscode.window.activeTextEditor.document.languageId;
+			let label = utils.getCurrentLanguage();
 			provider.addSnippet({label});
 		}),
 		vscode.workspace.onDidSaveTextDocument(function (e) {
 			if (
 				e.fileName.endsWith(".json") &&
-				e.fileName.toLowerCase().startsWith(utils.vsCodeSnippetsPath.toLowerCase())
+				e.fileName.toLowerCase().startsWith(utils.getVsCodeSnippetsPath().toLowerCase())
 			)
 				return provider.refresh();
 			if (e.fileName.endsWith(".code-snippets"))
@@ -115,6 +82,7 @@ function activate(context) {
 			}
 		}),
 		vscode.window.onDidChangeActiveTextEditor(function (e) {
+			if (!e) return;
 			let doc = e.document;
 			scope_provider.openFile(doc.fileName, doc.getText());
 		})

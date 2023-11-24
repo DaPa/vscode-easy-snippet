@@ -20,7 +20,7 @@ class SnippetNodeProvider {
 		try {
 			stat = fs.statSync(filename);
 		} catch (error) {
-			return {data: {}};
+			return {data: {}, list: []};
 		}
 		let cache = this.caches[languageId] || {};
 		if (cache && cache.t >= stat.mtime.getTime()) return cache;
@@ -57,8 +57,7 @@ class SnippetNodeProvider {
 	}
 
 	async search() {
-		let currentLanguage =
-			vscode.window.activeTextEditor && vscode.window.activeTextEditor.document.languageId;
+		let currentLanguage = utils.getCurrentLanguage();
 		let items = this.getChildren().map(({label}) => ({
 			label: label,
 			description: label == currentLanguage ? "current language" : "",
@@ -90,7 +89,7 @@ class SnippetNodeProvider {
 
 	getChildren(element) {
 		if (!element) {
-			let filenames = fs.readdirSync(utils.vsCodeSnippetsPath);
+			let filenames = fs.readdirSync(utils.getVsCodeSnippetsPath());
 			return filenames
 				.filter((x) => x.endsWith(".json"))
 				.map((x) => ({
@@ -112,7 +111,27 @@ class SnippetNodeProvider {
 	}
 
 	snippetPath(languageId) {
-		return path.join(utils.vsCodeSnippetsPath, languageId + ".json");
+		return path.join(utils.getVsCodeSnippetsPath(), languageId + ".json");
+	}
+
+	async pickSnippet(e) {
+		e = e || {};
+		if (!e.languageId) {
+			e.languageId = await utils.pickLanguage();
+			if (!e.languageId) return;
+		}
+		if (!e.key && !e.label) {
+			let cache = this.getSnippets(e.languageId);
+			let list = cache.list;
+			let item = await vscode.window.showQuickPick(list, {
+				placeHolder: list.length
+					? "please select snippet"
+					: "no snippet in " + e.languageId + ", please add first",
+			});
+			if (!item) return;
+			e.key = e.label = item.label;
+		}
+		return e;
 	}
 
 	async addGroup() {
@@ -126,14 +145,15 @@ class SnippetNodeProvider {
 	}
 
 	/**
-	 * @param {{label:string}} e
+	 * @param {{label:string}} item
 	 */
-	async addSnippet(e, def) {
+	async addSnippet(item, def) {
+		let languageId = (item && item.label) || (await utils.pickLanguage());
+		if (!languageId) return;
 		if (!def) {
 			let text = utils.getSelectedText();
 			if (text) def = {body: text.replace(/\$/g, "\\$")};
 		}
-		let languageId = e.label;
 		let key = await vscode.window.showInputBox({placeHolder: "snippet key"});
 		if (key) {
 			this.editSnippet({languageId, key}, def);
@@ -141,15 +161,24 @@ class SnippetNodeProvider {
 		}
 	}
 	async editGroup(item) {
-		let filename = this.snippetPath(item.label);
-		vscode.window.showTextDocument(vscode.Uri.file(filename));
+		let languageId = (item && item.label) || (await utils.pickLanguage());
+		if (!languageId) return;
+		let filename = this.snippetPath(languageId);
+		let url = vscode.Uri.file(filename);
+		const fs = vscode.workspace.fs;
+		if (!(await fs.stat(url).catch(() => false))) {
+			await fs.writeFile(url, Buffer.from("{}"));
+		}
+		vscode.window.showTextDocument(url);
 	}
 	async deleteGroup(item) {
+		let languageId = (item && item.label) || (await utils.pickLanguage());
+		if (!languageId) return;
 		let flag = await vscode.window.showQuickPick(["No", "Yes"], {
-			placeHolder: `Are you sure? delete snippet "${item.label}.json"`,
+			placeHolder: `Are you sure? delete snippet "${languageId}.json"`,
 		});
 		if (flag != "Yes") return;
-		let filename = this.snippetPath(item.label);
+		let filename = this.snippetPath(languageId);
 		fs.unlinkSync(filename);
 		this.refresh();
 	}
@@ -157,6 +186,8 @@ class SnippetNodeProvider {
 	 * @param {{label:string,languageId:string}} e
 	 */
 	async deleteSnippet(e) {
+		e = await this.pickSnippet(e);
+		if (!e) return;
 		let flag = await vscode.window.showQuickPick(["No", "Yes"], {
 			placeHolder: `Are you sure? delete snippet "${e.label}.${e.languageId}"`,
 		});
@@ -171,10 +202,44 @@ class SnippetNodeProvider {
 		this.refresh();
 	}
 	/**
+	 * @param {{label:string,languageId:string}} e
+	 */
+	async renameSnippet(e) {
+		e = await this.pickSnippet(e);
+		if (!e) return;
+		let cache = this.getSnippets(e.languageId);
+		if (!cache.data[e.label])
+			return vscode.window.showErrorMessage(`not found snippet: ${e.label}`);
+		let name = await vscode.window.showInputBox({placeHolder: "rename snippet"});
+		if (!name) return;
+		if (name == e.label) return;
+		if (cache.data[name]) {
+			let flag = await vscode.window.showQuickPick(["No", "Yes"], {
+				placeHolder: `Are you sure? overwrite snippet "${name}"`,
+			});
+			if (flag != "Yes") return;
+			cache.list = cache.list.filter((x) => x.label != name);
+		}
+		let filename = this.snippetPath(e.languageId);
+		cache.data[name] = cache.data[e.label];
+		delete cache.data[e.label];
+		let child = cache.list.find((x) => x.label == e.label);
+		if (child) {
+			child.label = name;
+			child.command.arguments[0].key = name;
+		}
+		fs.writeFileSync(filename, cjson.stringify(cache.data, null, 2), "utf8");
+		cache.t = +new Date();
+		this.refresh();
+		this.editSnippet({languageId: e.languageId, key: name});
+	}
+	/**
 	 * @param {{key:string,languageId:string}} e
 	 * @param {Snippet} def new snippet template
 	 */
 	async editSnippet(e, def) {
+		e = await this.pickSnippet(e);
+		if (!e) return;
 		def = Object.assign({prefix: e.key, body: ""}, def);
 		let snippet = this.getSnippet(e.languageId, e.key);
 		if (!snippet) snippet = def;
@@ -197,44 +262,6 @@ class SnippetNodeProvider {
 		});
 		editor.selection = utils.endSelection(editor.document);
 	}
-	/**
-	 * @param {string} text
-	 */
-	text2snippet(text, languageId) {
-		let comment = utils.getLineComment(languageId);
-		let snippet = {};
-		let lines = text.split("\n");
-		let body = "";
-		for (let i = 0; i < lines.length; i++) {
-			if (lines[i] == "/* eslint-disable */") {
-				body = lines.slice(i + 1);
-				while (body[0] == "") body.shift();
-				lines = lines.slice(0, i);
-				break;
-			}
-			if (!lines[i].startsWith(comment)) {
-				body = lines.slice(i);
-				while (body[0] == "") body.shift();
-				lines = lines.slice(0, i);
-				break;
-			}
-		}
-		let prev;
-		let key;
-		for (let line of lines) {
-			line = line.slice(comment.length);
-			let m = /\s*@\w+\s*/.exec(line);
-			if (m) {
-				prev = m[0];
-				key = prev.trim().slice(1);
-				snippet[key] = (snippet[key] || "") + line.slice(prev.length);
-			} else if (prev) {
-				snippet[key] += "\n" + line.replace(/^\s+/, "");
-			}
-		}
-		snippet.body = body;
-		return snippet;
-	}
 
 	/**
 	 * 保存代码片段
@@ -245,7 +272,7 @@ class SnippetNodeProvider {
 	saveSnippet(languageId, key, text) {
 		let filename = this.snippetPath(languageId);
 		let cache = this.getSnippets(languageId);
-		let snippet = this.text2snippet(text, languageId);
+		let snippet = utils.text2snippet(text, languageId);
 		if (!snippet.prefix) return vscode.window.showErrorMessage("@prefix is required");
 		if (!snippet.body || !snippet.body.length)
 			return vscode.window.showErrorMessage("snippet body can't be empty");

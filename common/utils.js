@@ -34,10 +34,14 @@ if (isPortable) {
 			break;
 	}
 }
-exports.vsCodeUserSettingsPath = vsCodeUserSettingsPath;
-exports.vsCodeSnippetsPath = path.join(vsCodeUserSettingsPath, "snippets");
-let json_caches = {};
+function getVsCodeSnippetsPath() {
+	let config = vscode.workspace.getConfiguration("easySnippet");
+	let snippetsPath = config.get("snippetsPath");
+	return snippetsPath || path.join(vsCodeUserSettingsPath, "snippets");
+}
+exports.getVsCodeSnippetsPath = getVsCodeSnippetsPath;
 
+let json_caches = {};
 function clearCaches() {
 	json_caches = {};
 }
@@ -55,6 +59,7 @@ function readJson(filename) {
 exports.readJson = readJson;
 function getSelectedText() {
 	let editor = vscode.window.activeTextEditor;
+	if (!editor) return "";
 	let content = editor.document.getText(editor.selection);
 	let lines = content.split("\n");
 	let minIndent = Infinity;
@@ -127,10 +132,14 @@ function getLineComment(languageId, def = "//") {
 	return config.comments.lineComment || def;
 }
 exports.getLineComment = getLineComment;
+function getCurrentLanguage() {
+	let editor = vscode.window.activeTextEditor;
+	if (editor) return editor.document.languageId;
+}
+exports.getCurrentLanguage = getCurrentLanguage;
 async function pickLanguage(filter) {
 	let languages = await vscode.languages.getLanguages();
-	let currentLanguage =
-		vscode.window.activeTextEditor && vscode.window.activeTextEditor.document.languageId;
+	let currentLanguage = getCurrentLanguage();
 	let items = languages.map((x) => {
 		let description;
 		let label = x;
@@ -157,20 +166,74 @@ function snippet2text(snippet, languageId) {
 	let keys = ["filepath", "key"].filter((k) => snippet[k]);
 	if (keys.length) keys.push("scope");
 	keys.push("prefix", "description");
-	for (let k of keys) {
-		let v = snippet[k] || "";
-		for (let item of v.split("\n")) {
-			text += `${comment} @${k} ${item}\n`;
-			if (k[0] != " ") k = Array.from(k).fill(" ").join();
+	for (let key of keys) {
+		let v = snippet[key] || "";
+		let arr = Array.isArray(v) ? v : [v];
+		for (let one of arr) {
+			let k = "@" + key;
+			for (let item of one.split("\n")) {
+				text += `${comment} ${k} ${item}\n`;
+				if (k[0] != " ") k = Array.from(k).fill(" ").join("");
+			}
 		}
 	}
-	if (languageId == "javascript") text += "/* eslint-disable */\n";
+	let config = vscode.workspace.getConfiguration("easySnippet");
+	let lintDisableHeader = config.get("lintDisableHeader");
+	if (lintDisableHeader[languageId]) text += lintDisableHeader[languageId] + "\n";
 	text += "\n";
 	if (snippet.body instanceof Array) text += snippet.body.join("\n");
 	else text += snippet.body || "";
 	return text;
 }
 exports.snippet2text = snippet2text;
+
+/**
+ * @param {string} text
+ * @param {string} languageId
+ */
+function text2snippet(text, languageId) {
+	let comment = getLineComment(languageId);
+	let config = vscode.workspace.getConfiguration("easySnippet");
+	let lintDisableHeader = config.get("lintDisableHeader");
+	let headers = new Set(
+		Object.values(lintDisableHeader)
+			.map((x) => x && x.trim())
+			.filter((x) => x)
+	);
+	let snippet = {};
+	let lines = text.split("\n").filter((x) => !headers.has(x.trim()));
+	let body = "";
+	for (let i = 0; i < lines.length; i++) {
+		if (!lines[i].startsWith(comment)) {
+			body = lines.slice(i);
+			while (body[0] == "") body.shift();
+			lines = lines.slice(0, i);
+			break;
+		}
+	}
+	let prev;
+	let key;
+	for (let line of lines) {
+		line = line.slice(comment.length);
+		let m = /^\s*@\w+\s*/.exec(line);
+		if (m) {
+			prev = m[0];
+			key = prev.trim().slice(1);
+			if (Array.isArray(snippet[key])) snippet[key].push(line.slice(prev.length));
+			else if (snippet[key]) snippet[key] = [snippet[key], line.slice(prev.length)];
+			else snippet[key] = line.slice(prev.length);
+		} else if (prev) {
+			let s = line.startsWith(" ".repeat(prev.length)) ? line.slice(prev.length) : line.trimStart();
+			let arr = snippet[key];
+			if (Array.isArray(arr)) arr[arr.length - 1] += "\n" + s;
+			else snippet[key] += "\n" + s;
+		}
+	}
+	snippet.body = body;
+	return snippet;
+}
+exports.text2snippet = text2snippet;
+
 function md5(s) {
 	return crypto.createHash("md5").update(s).digest("hex");
 }
