@@ -137,28 +137,23 @@ function getCurrentLanguage() {
 	if (editor) return editor.document.languageId;
 }
 exports.getCurrentLanguage = getCurrentLanguage;
-async function pickLanguage(filter) {
+async function getLanguages(additionalLanguages) {
 	let languages = await vscode.languages.getLanguages();
+	if (additionalLanguages) languages = languages.concat(additionalLanguages);
+	let set = new Set(languages);
+	if (set.has("vue")) set.add("vue-html");
 	let currentLanguage = getCurrentLanguage();
-	let items = languages.map((x) => {
-		let description;
-		let label = x;
-		if (x === currentLanguage) description = "current language";
-		return {label, description};
+	if (currentLanguage) set.delete(currentLanguage);
+	languages = Array.from(set);
+	languages.sort();
+	if (currentLanguage) languages.unshift(currentLanguage);
+	let items = languages.map((label) => {
+		if (label === currentLanguage) return {label, description: "current language"};
+		return {label};
 	});
-	if (currentLanguage)
-		items.sort((a, b) => {
-			if (a.description) return -1;
-			if (b.description) return 1;
-			return a.label > b.label ? -1 : 1;
-		});
-	if (filter) items = filter(items);
-	let item = await vscode.window.showQuickPick(items, {
-		placeHolder: "please select snippet language",
-	});
-	return item && item.label;
+	return items;
 }
-exports.pickLanguage = pickLanguage;
+exports.getLanguages = getLanguages;
 function snippet2text(snippet, languageId) {
 	if (!languageId && snippet.scope) languageId = snippet.scope.split(",")[0];
 	let comment = getLineComment(languageId);

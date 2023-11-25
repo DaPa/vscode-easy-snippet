@@ -2,7 +2,7 @@
 	"name": "easy-snippet",
 	"displayName": "Easy Snippet",
 	"description": "Turn your selection into a snippet",
-	"version": "0.7.1",
+	"version": "0.7.2",
 	"publisher": "inu1255",
 	"engines": {
 		"vscode": "^1.16.0"
@@ -27,7 +27,7 @@
 	"contributes": {
 		"commands": [{
 				"command": "easySnippet.run",
-				"title": "Add Snippet from Selection",
+				"title": "Add Snippet From Selection",
 				"category": "Easy Snippet"
 			},
 			{
@@ -201,8 +201,7 @@
 		"keybindings": [{
 			"command": "easySnippet.run",
 			"key": "ctrl+k shift+ctrl+s",
-			"mac": "cmd+k shift+cmd+s",
-			"when": "editorTextFocus"
+			"mac": "cmd+k shift+cmd+s"
 		}],
 		"viewsContainers": {
 			"activitybar": [{
@@ -224,8 +223,7 @@
 		},
 		"menus": {
 			"commandPalette": [{
-					"command": "easySnippet.run",
-					"when": "editorHasSelection"
+					"command": "easySnippet.run"
 				},
 				{
 					"command": "snippetExplorer.addSnippet"

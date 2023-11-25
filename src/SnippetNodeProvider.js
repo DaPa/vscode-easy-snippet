@@ -114,10 +114,20 @@ class SnippetNodeProvider {
 		return path.join(utils.getVsCodeSnippetsPath(), languageId + ".json");
 	}
 
+	async pickLanguage() {
+		let items = await utils.getLanguages(this.getChildren().map((x) => x.label));
+		let languageId = await vscode.window
+			.showQuickPick(items, {
+				placeHolder: "please select snippet language",
+			})
+			.then((x) => x && x.label);
+		return languageId;
+	}
+
 	async pickSnippet(e) {
 		e = e || {};
 		if (!e.languageId) {
-			e.languageId = await utils.pickLanguage();
+			e.languageId = await this.pickLanguage();
 			if (!e.languageId) return;
 		}
 		if (!e.key && !e.label) {
@@ -136,7 +146,13 @@ class SnippetNodeProvider {
 
 	async addGroup() {
 		let set = new Set(this.getChildren().map((x) => x.label));
-		let languageId = await utils.pickLanguage((items) => items.filter((x) => !set.has(x.label)));
+		let items = await utils.getLanguages();
+		items = items.filter((x) => !set.has(x.label));
+		let languageId = await vscode.window
+			.showQuickPick(items, {
+				placeHolder: "please select snippet language",
+			})
+			.then((x) => x && x.label);
 		if (!languageId) return;
 		let filename = this.snippetPath(languageId);
 		if (!fs.existsSync(filename)) fs.writeFileSync(filename, "{}");
@@ -148,7 +164,7 @@ class SnippetNodeProvider {
 	 * @param {{label:string}} item
 	 */
 	async addSnippet(item, def) {
-		let languageId = (item && item.label) || (await utils.pickLanguage());
+		let languageId = (item && item.label) || (await this.pickLanguage());
 		if (!languageId) return;
 		if (!def) {
 			let text = utils.getSelectedText();
@@ -161,7 +177,7 @@ class SnippetNodeProvider {
 		}
 	}
 	async editGroup(item) {
-		let languageId = (item && item.label) || (await utils.pickLanguage());
+		let languageId = (item && item.label) || (await this.pickLanguage());
 		if (!languageId) return;
 		let filename = this.snippetPath(languageId);
 		let url = vscode.Uri.file(filename);
@@ -172,7 +188,7 @@ class SnippetNodeProvider {
 		vscode.window.showTextDocument(url);
 	}
 	async deleteGroup(item) {
-		let languageId = (item && item.label) || (await utils.pickLanguage());
+		let languageId = (item && item.label) || (await this.pickLanguage());
 		if (!languageId) return;
 		let flag = await vscode.window.showQuickPick(["No", "Yes"], {
 			placeHolder: `Are you sure? delete snippet "${languageId}.json"`,
@@ -278,6 +294,7 @@ class SnippetNodeProvider {
 			return vscode.window.showErrorMessage("snippet body can't be empty");
 		if (cache.data[key]) Object.assign(cache.data[key], snippet);
 		else cache.data[key] = snippet;
+		if (!cache.data[key].description) delete cache.data[key].description;
 		fs.writeFileSync(filename, cjson.stringify(cache.data, null, 2), "utf8");
 		let item = cache.list.find((x) => x.label == key);
 		if (item) item.description = snippet.description;

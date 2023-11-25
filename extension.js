@@ -43,9 +43,6 @@ function activate(context) {
 			explorer.reveal(provider.getChildren()[0]);
 		}),
 		vscode.commands.registerCommand("easySnippet.run", async function () {
-			let text = utils.getSelectedText();
-			if (!text)
-				return vscode.window.showWarningMessage("can't convert to snippet by select nothing");
 			if (scope_provider.data.length) {
 				let items = [{label: "vscode snippet"}].concat(scope_provider.data);
 				let item = await vscode.window.showQuickPick(items, {placeHolder: "select snippet scope"});

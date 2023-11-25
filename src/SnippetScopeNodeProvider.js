@@ -334,6 +334,7 @@ class SnippetScopeNodeProvider {
 		let data = item ? item.data : {};
 		if (data[snippet.key]) Object.assign(data[snippet.key], rest);
 		else data[snippet.key] = rest;
+		if (!data[snippet.key].description) delete data[snippet.key].description;
 		let content = cjson.stringify(data, null, 2);
 		fs.writeFileSync(filepath, content, "utf8");
 		item.text = content;
