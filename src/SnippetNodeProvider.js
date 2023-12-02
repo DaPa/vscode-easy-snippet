@@ -47,6 +47,39 @@ class SnippetNodeProvider {
 		return (this.caches[languageId] = cache);
 	}
 
+	getDragData(node) {
+		if (node.contextValue != "snippet") return;
+		let cache = this.getSnippets(node.languageId);
+		let snippet = cache.data[node.label];
+		return {
+			...snippet,
+			scope: node.languageId,
+			key: node.label,
+			languageId: node.languageId,
+			type: "snippetExplorer",
+		};
+	}
+
+	async onDrop(target, data) {
+		let {prefix, body, description, key} = data;
+		let languageId = target.languageId || target.label;
+		if (languageId == data.languageId) return;
+		let cache = this.getSnippets(languageId);
+		if (cache.data[key]) {
+			if (!(await utils.confirm("Are you sure? overwrite snippet: " + key))) return;
+		}
+		return await this.saveSnippet(
+			{
+				languageId,
+				key,
+				prefix,
+				body,
+				description,
+			},
+			true
+		);
+	}
+
 	getSnippet(languageId, key) {
 		let cache = this.getSnippets(languageId);
 		return cache.data[key];
@@ -141,6 +174,7 @@ class SnippetNodeProvider {
 			if (!item) return;
 			e.key = e.label = item.label;
 		}
+		e.label = e.label || e.key;
 		return e;
 	}
 
@@ -190,10 +224,7 @@ class SnippetNodeProvider {
 	async deleteGroup(item) {
 		let languageId = (item && item.label) || (await this.pickLanguage());
 		if (!languageId) return;
-		let flag = await vscode.window.showQuickPick(["No", "Yes"], {
-			placeHolder: `Are you sure? delete snippet "${languageId}.json"`,
-		});
-		if (flag != "Yes") return;
+		if (!(await utils.confirm(`Are you sure? delete snippet "${languageId}.json"`))) return;
 		let filename = this.snippetPath(languageId);
 		fs.unlinkSync(filename);
 		this.refresh();
@@ -201,13 +232,14 @@ class SnippetNodeProvider {
 	/**
 	 * @param {{label:string,languageId:string}} e
 	 */
-	async deleteSnippet(e) {
+	async deleteSnippet(e, isForce) {
 		e = await this.pickSnippet(e);
 		if (!e) return;
-		let flag = await vscode.window.showQuickPick(["No", "Yes"], {
-			placeHolder: `Are you sure? delete snippet "${e.label}.${e.languageId}"`,
-		});
-		if (flag != "Yes") return;
+		if (
+			!isForce &&
+			!(await utils.confirm(`Are you sure? delete snippet "${e.label}.${e.languageId}"`))
+		)
+			return;
 		let cache = this.getSnippets(e.languageId);
 		if (!cache.data[e.label]) return;
 		let filename = this.snippetPath(e.languageId);
@@ -230,10 +262,7 @@ class SnippetNodeProvider {
 		if (!name) return;
 		if (name == e.label) return;
 		if (cache.data[name]) {
-			let flag = await vscode.window.showQuickPick(["No", "Yes"], {
-				placeHolder: `Are you sure? overwrite snippet "${name}"`,
-			});
-			if (flag != "Yes") return;
+			if (!(await utils.confirm(`Are you sure? overwrite snippet "${name}"`))) return;
 			cache.list = cache.list.filter((x) => x.label != name);
 		}
 		let filename = this.snippetPath(e.languageId);
@@ -281,17 +310,19 @@ class SnippetNodeProvider {
 
 	/**
 	 * 保存代码片段
-	 * @param {string} languageId
-	 * @param {string} key
-	 * @param {string} text
 	 */
-	saveSnippet(languageId, key, text) {
+	saveSnippet(data, isDrog) {
+		let {languageId, key, ...snippet} = data;
 		let filename = this.snippetPath(languageId);
 		let cache = this.getSnippets(languageId);
-		let snippet = utils.text2snippet(text, languageId);
-		if (!snippet.prefix) return vscode.window.showErrorMessage("@prefix is required");
-		if (!snippet.body || !snippet.body.length)
-			return vscode.window.showErrorMessage("snippet body can't be empty");
+		if (!snippet.prefix) {
+			vscode.window.showErrorMessage("@prefix is required");
+			return;
+		}
+		if (!snippet.body || !snippet.body.length) {
+			vscode.window.showErrorMessage("snippet body can't be empty");
+			return;
+		}
 		if (cache.data[key]) Object.assign(cache.data[key], snippet);
 		else cache.data[key] = snippet;
 		if (!cache.data[key].description) delete cache.data[key].description;
@@ -313,9 +344,11 @@ class SnippetNodeProvider {
 			cache.list.sort((a, b) => (a.label > b.label ? 1 : -1));
 		}
 		cache.t = +new Date();
-		vscode.window.showInformationMessage(`snippet "${key}.${languageId}" save success`);
+		if (!isDrog)
+			vscode.window.showInformationMessage(`snippet "${key}.${languageId}" save success`);
 		this.refresh();
 		this.tree.reveal({languageId, label: key});
+		return true;
 	}
 }
 

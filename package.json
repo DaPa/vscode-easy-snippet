@@ -2,7 +2,7 @@
 	"name": "easy-snippet",
 	"displayName": "Easy Snippet",
 	"description": "Turn your selection into a snippet",
-	"version": "0.7.2",
+	"version": "0.7.3",
 	"publisher": "inu1255",
 	"engines": {
 		"vscode": "^1.16.0"
@@ -373,12 +373,12 @@
 	"devDependencies": {
 		"@types/mocha": "^2.2.42",
 		"@types/node": "^7.0.0",
+		"@types/vscode": "^1.84.2",
 		"mocha": "^3.5.0",
 		"typescript": "^2.5.2",
 		"vscode": "^1.1.30"
 	},
 	"dependencies": {
-		"@types/vscode": "^1.17.0",
 		"comment-json": "^4.2.3"
 	},
 	"repository": {

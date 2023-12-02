@@ -128,8 +128,7 @@ exports.getLanguageConfig = getLanguageConfig;
  **/
 function getLineComment(languageId, def = "//") {
 	let config = getLanguageConfig(languageId);
-	if (!config) return def;
-	return config.comments.lineComment || def;
+	return (config && config.comments && config.comments.lineComment) || def;
 }
 exports.getLineComment = getLineComment;
 function getCurrentLanguage() {
@@ -233,3 +232,12 @@ function md5(s) {
 	return crypto.createHash("md5").update(s).digest("hex");
 }
 exports.md5 = md5;
+
+function confirm(msg) {
+	return vscode.window
+		.showQuickPick(["No", "Yes"], {
+			placeHolder: msg,
+		})
+		.then((flag) => flag == "Yes");
+}
+exports.confirm = confirm;

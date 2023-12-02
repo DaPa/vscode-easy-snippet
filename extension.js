@@ -2,6 +2,7 @@ const vscode = require("vscode");
 const path = require("path");
 const SnippetNodeProvider = require("./src/SnippetNodeProvider");
 const SnippetScopeNodeProvider = require("./src/SnippetScopeNodeProvider");
+const DragAndDropController = require("./src/DragAndDropController");
 const utils = require("./common/utils");
 
 /**
@@ -9,11 +10,17 @@ const utils = require("./common/utils");
  */
 function activate(context) {
 	let provider = new SnippetNodeProvider();
-	let explorer = vscode.window.createTreeView("snippetExplorer", {treeDataProvider: provider});
+	let explorer = vscode.window.createTreeView("snippetExplorer", {
+		treeDataProvider: provider,
+		dragAndDropController: new DragAndDropController(provider),
+		showCollapseAll: true,
+	});
 	provider.tree = explorer;
 	let scope_provider = new SnippetScopeNodeProvider();
 	let scope_explorer = vscode.window.createTreeView("snippetScopeExplorer", {
 		treeDataProvider: scope_provider,
+		dragAndDropController: new DragAndDropController(scope_provider),
+		showCollapseAll: true,
 	});
 	scope_provider.tree = scope_explorer;
 	scope_provider.refresh();
@@ -69,13 +76,15 @@ function activate(context) {
 				if (ss.length != 2) return;
 				let key = Buffer.from(ss[0].replace(/-/g, "/"), "base64").toString();
 				let languageId = ss[1];
-				provider.saveSnippet(languageId, key, e.getText());
+				let snippet = utils.text2snippet(e.getText(), languageId);
+				provider.saveSnippet({...snippet, languageId, key});
 				provider.refresh();
 			}
 			if (e.fileName.endsWith(".scopesnippet")) {
 				let name = path.basename(e.fileName, ".scopesnippet");
 				let languageId = name.split(".").pop();
-				scope_provider.saveSnippet(e.getText(), languageId);
+				let snippet = utils.text2snippet(e.getText(), languageId);
+				scope_provider.saveSnippet(snippet);
 			}
 		}),
 		vscode.window.onDidChangeActiveTextEditor(function (e) {

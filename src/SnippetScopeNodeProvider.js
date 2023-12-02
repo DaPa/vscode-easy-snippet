@@ -59,6 +59,36 @@ class SnippetScopeNodeProvider {
 		this._onDidChangeTreeData.fire();
 	}
 
+	getDragData(node) {
+		if (!node.parent) return;
+		return {
+			...node.parent.data[node.label],
+			key: node.label,
+			filepath: node.parent.filepath,
+			type: "snippetScopeExplorer",
+		};
+	}
+
+	async onDrop(target, data) {
+		let {prefix, body, description, scope, key} = data;
+		let group = target.parent || target;
+		if (group.filepath == data.filepath) return;
+		if (group.data[key]) {
+			if (!(await utils.confirm("Are you sure? overwrite snippet: " + key))) return;
+		}
+		return await this.saveSnippet(
+			{
+				filepath: group.filepath,
+				key,
+				prefix,
+				body,
+				description,
+				scope,
+			},
+			true
+		);
+	}
+
 	refresh() {
 		this.data = [];
 		// active file
@@ -119,7 +149,7 @@ class SnippetScopeNodeProvider {
 		if (e.contextValue) return e;
 		let item = this.findGroup(e.filepath);
 		if (!item) return;
-		return item.children.find((x) => x.label == e.label);
+		return item.children.find((x) => x.label == (e.label || e.key));
 	}
 
 	getChildren(element) {
@@ -214,16 +244,16 @@ class SnippetScopeNodeProvider {
 			item = await this.pickGroup();
 			if (!item) return;
 		}
-		let flag = await vscode.window.showQuickPick(["No", "Yes"], {
-			placeHolder: `Are you sure? delete snippet "${item.label}.json"`,
-		});
-		if (flag != "Yes") return;
+		if (!(await utils.confirm("Are you sure? delete snippet file: " + item.filepath))) return;
 		fs.unlinkSync(item.filepath);
 		this.data = this.data.filter((x) => x.filepath != item.filepath);
 		this._onDidChangeTreeData.fire();
 	}
 
-	async deleteSnippet(e) {
+	async deleteSnippet(e, isForce) {
+		console.log("deleteSnippet0", e);
+		if (e && !e.parent) e = this.getTreeItem(e);
+		console.log("deleteSnippet1", e);
 		if (!e) {
 			// call from command
 			e = await this.pickSnippet();
@@ -235,10 +265,7 @@ class SnippetScopeNodeProvider {
 		if (!item) return vscode.window.showErrorMessage(`snippet file not found: ${e.filepath}`);
 		if (!item.data[e.label])
 			return vscode.window.showErrorMessage(`snippet "${e.label}" not found in ${e.filepath}`);
-		let flag = await vscode.window.showQuickPick(["No", "Yes"], {
-			placeHolder: `Are you sure? delete snippet "${e.label}.${e.languageId}"`,
-		});
-		if (flag != "Yes") return;
+		if (!isForce && !(await utils.confirm("Are you sure? delete snippet: " + e.label))) return;
 		delete item.data[e.label];
 		item.children = item.children.filter((x) => x.label != e.label);
 		let content = cjson.stringify(item.data, null, 2);
@@ -263,10 +290,7 @@ class SnippetScopeNodeProvider {
 		if (!name) return;
 		if (name == e.label) return;
 		if (item.data[name]) {
-			let flag = await vscode.window.showQuickPick(["No", "Yes"], {
-				placeHolder: `Are you sure? overwrite snippet "${name}"`,
-			});
-			if (flag != "Yes") return;
+			if (!(await utils.confirm("Are you sure? overwrite snippet: " + name))) return;
 			item.children = item.children.filter((x) => x.label != name);
 		}
 		item.data[name] = item.data[e.label];
@@ -322,23 +346,33 @@ class SnippetScopeNodeProvider {
 	/**
 	 * 保存代码片段
 	 */
-	saveSnippet(text, languageId) {
-		let snippet = utils.text2snippet(text, languageId);
+	saveSnippet(snippet, isDrog) {
 		let {filepath, key, ...rest} = snippet;
-		if (!filepath) return vscode.window.showErrorMessage("@filepath is required");
-		if (!key) return vscode.window.showErrorMessage("@key is required");
-		if (!snippet.prefix) return vscode.window.showErrorMessage("@prefix is required");
-		if (!snippet.body || !snippet.body.length)
-			return vscode.window.showErrorMessage("snippet body can't be empty");
+		if (!filepath) {
+			vscode.window.showErrorMessage("@filepath is required");
+			return;
+		}
+		if (!key) {
+			vscode.window.showErrorMessage("@key is required");
+			return;
+		}
+		if (!snippet.prefix) {
+			vscode.window.showErrorMessage("@prefix is required");
+			return;
+		}
+		if (!snippet.body || !snippet.body.length) {
+			vscode.window.showErrorMessage("snippet body can't be empty");
+			return;
+		}
 		let item = this.findGroup(filepath);
 		let data = item ? item.data : {};
-		if (data[snippet.key]) Object.assign(data[snippet.key], rest);
-		else data[snippet.key] = rest;
-		if (!data[snippet.key].description) delete data[snippet.key].description;
+		if (data[key]) Object.assign(data[key], rest);
+		else data[key] = rest;
+		if (!data[key].description) delete data[key].description;
 		let content = cjson.stringify(data, null, 2);
 		fs.writeFileSync(filepath, content, "utf8");
 		item.text = content;
-		vscode.window.showInformationMessage(`scope snippet "${key}" save success`);
+		if (!isDrog) vscode.window.showInformationMessage(`scope snippet "${key}" save success`);
 		if (item) {
 			let child = item.children.find((x) => x.label == key);
 			if (child) {
@@ -363,6 +397,7 @@ class SnippetScopeNodeProvider {
 			this.openFile(filepath, content);
 		}
 		this.tree.reveal({filepath, label: key});
+		return true;
 	}
 }
 
