@@ -46,7 +46,7 @@ function activate(context) {
 				];
 			})
 			.flat(),
-		vscode.commands.registerCommand("snippetScopeExplorer.open", function () {
+		vscode.commands.registerCommand("snippetExplorer.open", function () {
 			explorer.reveal(provider.getChildren()[0]);
 		}),
 		vscode.commands.registerCommand("easySnippet.run", async function () {
