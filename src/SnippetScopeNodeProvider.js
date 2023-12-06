@@ -99,7 +99,7 @@ class SnippetScopeNodeProvider {
 		}
 		// workspace
 		let fs = vscode.workspace.fs;
-		for (let folder of vscode.workspace.workspaceFolders) {
+		for (let folder of vscode.workspace.workspaceFolders || []) {
 			console.log("scan folder:", folder.uri.fsPath);
 			fs.readDirectory(vscode.Uri.file(path.join(folder.uri.fsPath, ".vscode"))).then((list) => {
 				list.forEach(([filepath, type]) => {

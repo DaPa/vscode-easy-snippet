@@ -23,7 +23,9 @@ function activate(context) {
 		showCollapseAll: true,
 	});
 	scope_provider.tree = scope_explorer;
-	scope_provider.refresh();
+	setTimeout(() => {
+		scope_provider.refresh();
+	});
 	context.subscriptions.push(
 		...[
 			"refresh",
