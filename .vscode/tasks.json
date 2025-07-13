@@ -5,7 +5,7 @@
 	"tasks": [
 		{
 			"type": "npm",
-			"script": "watch",
+			"script": "$(eye-watch) watch",
 			"problemMatcher": "$tsc-watch",
 			"isBackground": true,
 			"presentation": {
@@ -14,7 +14,92 @@
 			"group": {
 				"kind": "build",
 				"isDefault": true
-			}
-		}
+			},
+			"options": {
+				"statusbar": {
+					"color": "#FFFFFF",
+					"position": -1
+				},
+			},
+		},
+		{
+			"label": "$(zap) clean",
+			"detail": "removed installed npm dependencies",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"rm -rf node_modules out package-lock.json"
+			],
+			"isBackground": false,
+			"presentation": {
+				"reveal": "always",
+				"clear": true
+			},
+			"group": {
+				"kind": "build",
+				"isDefault": false
+			},
+			"problemMatcher": [],
+			"options": {
+				"statusbar": {
+					"color": "#AA0000",
+					"position": -1
+				},
+			},
+		},
+		{
+			"label": "$(tasks-list-configure) prep",
+			"detail": "install npm dependencies from package",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"npm install"
+				// "npm install && npm audit fix"
+			],
+			"isBackground": false,
+			"presentation": {
+				"reveal": "always",
+				"clear": true
+			},
+			"group": {
+				"kind": "build",
+				"isDefault": false
+			},
+			"problemMatcher": [],
+			"options": {
+				"statusbar": {
+					"color": "#AAAAAA",
+					"position": -1
+				},
+			},
+		},
+		{
+			"label": "$(package) build",
+			"detail": "Package Extension (no yarn)",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"vsce package --no-yarn"
+			],
+			"isBackground": false,
+			"presentation": {
+				"reveal": "always",
+				"clear": true
+			},
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			},
+			"problemMatcher": [],
+			"options": {
+				"statusbar": {
+					"color": "#00AA00",
+					"position": -1
+				},
+			},
+		},
 	]
 }

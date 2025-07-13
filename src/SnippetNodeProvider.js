@@ -309,7 +309,7 @@ class SnippetNodeProvider {
 	}
 
 	/**
-	 * 保存代码片段
+	 * Save code snippet
 	 */
 	saveSnippet(data, isDrog) {
 		let {languageId, key, ...snippet} = data;

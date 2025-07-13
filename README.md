@@ -21,7 +21,7 @@ change default keymaps `cmd+. cmd+s` to `cmd+k shift+cmd+s`, [issue#5](https://g
 
 ### 0.1.5
 
-support insiders version, improve the marketplace listing 
+support insiders version, improve the marketplace listing
 
 ### 0.0.1
 

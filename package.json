@@ -25,7 +25,8 @@
 		"ui"
 	],
 	"contributes": {
-		"commands": [{
+		"commands": [
+			{
 				"command": "easySnippet.run",
 				"title": "Add Snippet From Selection",
 				"category": "Easy Snippet"
@@ -198,20 +199,25 @@
 				}
 			}
 		],
-		"keybindings": [{
-			"command": "easySnippet.run",
-			"key": "ctrl+k shift+ctrl+s",
-			"mac": "cmd+k shift+cmd+s"
-		}],
+		"keybindings": [
+			{
+				"command": "easySnippet.run",
+				"key": "ctrl+k shift+ctrl+s",
+				"mac": "cmd+k shift+cmd+s"
+			}
+		],
 		"viewsContainers": {
-			"activitybar": [{
-				"id": "snippet-explorer",
-				"title": "Snippet",
-				"icon": "media/snippet.svg"
-			}]
+			"activitybar": [
+				{
+					"id": "snippet-explorer",
+					"title": "Snippet",
+					"icon": "media/snippet.svg"
+				}
+			]
 		},
 		"views": {
-			"snippet-explorer": [{
+			"snippet-explorer": [
+				{
 					"id": "snippetExplorer",
 					"name": "Snippet Manager"
 				},
@@ -222,7 +228,8 @@
 			]
 		},
 		"menus": {
-			"commandPalette": [{
+			"commandPalette": [
+				{
 					"command": "easySnippet.run"
 				},
 				{
@@ -262,7 +269,8 @@
 					"command": "snippetScopeExplorer.editSnippet"
 				}
 			],
-			"view/title": [{
+			"view/title": [
+				{
 					"command": "snippetExplorer.search",
 					"when": "view == snippetExplorer",
 					"group": "navigation"
@@ -293,7 +301,8 @@
 					"group": "navigation"
 				}
 			],
-			"view/item/context": [{
+			"view/item/context": [
+				{
 					"command": "snippetExplorer.addSnippet",
 					"when": "view == snippetExplorer && viewItem == group",
 					"group": "inline@1"
@@ -374,7 +383,7 @@
 		"@types/mocha": "^2.2.42",
 		"@types/node": "^7.0.0",
 		"@types/vscode": "^1.32.2",
-		"mocha": "^3.5.0",
+		"mocha": "^11.7.1",
 		"typescript": "^2.5.2",
 		"vscode": "^1.1.30"
 	},

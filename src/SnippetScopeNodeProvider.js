@@ -344,7 +344,7 @@ class SnippetScopeNodeProvider {
 	}
 
 	/**
-	 * 保存代码片段
+	 * Save code snippet
 	 */
 	saveSnippet(snippet, isDrog) {
 		let {filepath, key, ...rest} = snippet;

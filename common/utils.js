@@ -115,14 +115,14 @@ function getLanguageConfig(languageId) {
 			}
 		}
 	}
-	// Validate config file existance
+	// Validate config file existence
 	if (!!langConfigFilepath && fs.existsSync(langConfigFilepath)) {
 		return readJson(langConfigFilepath);
 	}
 }
 exports.getLanguageConfig = getLanguageConfig;
 /**
- * 获取指定lang的行内注释
+ * Get the inline comments of the specified lang
  * @param {string} languageId
  * @param {string} [def]
  **/
